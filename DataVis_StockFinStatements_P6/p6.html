@@ -32,25 +32,28 @@
 	<script type="text/javascript">
 		// helper functions
 		function resize() {
-			var card = document.getElementById('card_RatioCurrent');	//  $('#card_RatioCurrent');
+			var card = document.getElementById('card_RatioCurrent');
 			var width = parseInt(window.getComputedStyle(card,null).getPropertyValue("width"));
 			var height = parseInt(window.getComputedStyle(card,null).getPropertyValue("height"));
-			$('#temp').html('Card size: ' + width + ' x ' + height);
-
+			//$('#temp').html('Card size: ' + width + ' x ' + height);
 			redraw();
-			/*
-			// change size of all sparklines
-			var spLines = $('.sparkline');
-			for(var i=0; i < spLines.length; i++) {
-				spLines[i].setAttribute('width', width);
-				spLines[i].setAttribute('height', Math.floor(height*0.5));
-			}
-			*/
+			$('html, body').animate({ scrollTop: 0 }, 'fast');
 		};
 	</script>
 	<script type="text/javascript">
 		var fin_data = [];	// globally accessible
-	
+		var margin = 10,
+			clr_main = 'white',
+			clr_highlight = '#24ff24',
+			clr_bkg_info = '#9f86ff',
+			clr_bkg_success = '#1bc98e',
+			clr_bkg_danger = '#e64759';
+		var formatDateShort = d3.time.format("%b %Y");	// https://github.com/d3/d3/wiki/Time-Formatting
+
+		function isUndefOrNaN(value) {
+			return (value === undefined || value === NaN);
+		}
+		
 		function get_RawData(dtype) {
 			return fin_data.filter(function(el) {
 				return (el.HVTypeName == dtype);
@@ -62,17 +65,21 @@
 				return {
 					'min' : NaN,
 					'max' : NaN,
-					'last' : NaN
+					'last' : NaN,
+					'minDate' : NaN,
+					'maxDate' : NaN
 				};
 			}
-			//var minValue = Math.min.apply(Math, filteredData.map(function(el){return el.Value;})),
-			//	maxValue = Math.max.apply(Math, filteredData.map(function(el){return el.Value;}));
-			var minValue = d3.min(filteredData, function(el){return el.Value;}),
-				maxValue = d3.max(filteredData, function(el){return el.Value;});
+			var minValue = d3.min(filteredData, function(el){return +el.Value;}),
+				maxValue = d3.max(filteredData, function(el){return +el.Value;});
+			var minDate = d3.min(filteredData, function(el){return el.Date;}),
+				maxDate = d3.max(filteredData, function(el){return el.Date;});
 			return {
 				'min' : minValue,
 				'max' : maxValue,
-				'last' : filteredData[0].Value
+				'last' : filteredData[0].Value,
+				'minDate' : minDate,
+				'maxDate' : maxDate
 			};
 		}
 
@@ -86,33 +93,33 @@
 			var item = {};
 			for (var i = 0; i < filteredData.length; i++) {
 				if (i > 0) {
-					item["Value"] = filteredData[i].Value == 0 ? 0 : (((item["Value"] / filteredData[i].Value) - 1) * 100).toFixed(2);
+					if (item["Value"] < 0 || filteredData[i].Value < 0) {
+						item["Value"] = NaN;
+					}
+					else {
+						item["Value"] = filteredData[i].Value == 0 ? 0 : (((item["Value"] / filteredData[i].Value) - 1) * 100).toFixed(2);
+					}
 					res.push(item);
 					item = {};
 				}
 				item["Date"] = filteredData[i].Date;
-				item["Value"] = filteredData[i].Value;
+				item["Value"] = +filteredData[i].Value;
 			}
 			return res;
 		}
 		
-		function draw_Card(dest_id, data_type, comp_value, comp_logic) {
+		function draw_Card(dest_id, data_type, comp_value, comp_logic, title) {
 			// dest_id - destination element id
 			// data_type - data type to draw. Should be equal to HVTypeNames in the raw data file
 			// comp_value - value to compare with. set to NaN if no comparison needed.
 			// comp_logic: -1, 0, 1. Where -1 - less then; 0 - equals to; 1 - greater than.
+			// title: card title (optional)
+			title = typeof title !== 'undefined' ? title : '';
 			var dest = d3.select('#' + dest_id);
 			if (dest == null)
 				return false;
 
-			// get data ready
-			var data = get_RawData(data_type);
-			var stat = get_Stat(data);
-
-			var clr_highlight = '#24ff24';
-			var clr_bkg_info = "#9f86ff";
-			var div = d3.select('#tooltip');	// tooltip placeholder
-			var formatDateShort = d3.time.format("%b %Y");	// https://github.com/d3/d3/wiki/Time-Formatting
+			var ttip = d3.select('#tooltip');	// tooltip placeholder
 			
 			// --- sparkline drawing ---
 			var svg = dest.select('svg');
@@ -120,27 +127,31 @@
 			svg.html('');
 			dest.select('.statcard-number').text("");
 			dest.style('background-color', clr_bkg_info); 
-			
-			var y_min = Math.min(0, stat.min, isNaN(comp_value) ? 0 : comp_value*1.01);
-			var y_max = Math.max(0, stat.max, isNaN(comp_value) ? 0 : comp_value*1.01);
-			var width = parseInt(window.getComputedStyle(svg[0][0],null).getPropertyValue("width"));
-			var height = parseInt(window.getComputedStyle(svg[0][0],null).getPropertyValue("height"));
-			svg.attr('width', width)
-				.attr('height', height)
-				.append('g')
-				.attr('transform', 'translate(10,10)');
-			;
+
+			// get data ready
+			var data = get_RawData(data_type);
+			var stat = get_Stat(data);
 			if (data == null || data.length == 0 || isNaN(stat.last)) {
 				dest.select('.statcard-number').text("unavailable");
 				return true;
 			}
 			
+			var y_min = Math.min(0, isUndefOrNaN(stat.min) ? 0 : stat.min, isNaN(comp_value) ? 0 : comp_value*1.01);
+			var y_max = Math.max(0, isUndefOrNaN(stat.max) ? 0 : stat.max, isNaN(comp_value) ? 0 : comp_value*1.01);
+			var width = parseInt(window.getComputedStyle(svg[0][0],null).getPropertyValue("width"));
+			var height = parseInt(window.getComputedStyle(svg[0][0],null).getPropertyValue("height"));
+			svg.attr('width', width)
+				.attr('height', height)
+				.append('g')
+				.attr('transform', 'translate(' + margin + ',' + margin + ')');
+			;
+			
 			var scale_x = d3.scale.linear()
 				.domain(d3.extent(data, function(el) { return el.Date; }))
-				.range([10, width - 10]);
+				.range([margin, width - margin]);
 			var scale_y = d3.scale.linear()
 				.domain([y_min, y_max])	// d3.extent(data, function(el) { return el.Value; })
-				.range([height - 10, 10]);
+				.range([height - margin, margin]);
 
 			var line = d3.svg.line()
 				//.interpolate("basis")
@@ -158,7 +169,7 @@
 				.duration(500)
 				.attr('class', 'sparkline')
 				.attr('d', line)
-				.style('stroke', 'white')
+				.style('stroke', clr_main)
 				.style('stroke-opacity', 0.8)
 				.style('stroke-width', 2)
 				.style('fill', 'none')
@@ -170,7 +181,7 @@
 				.attr('class', 'sparkline')
 				.attr('d', area)
 				.style('stroke-width', 0)
-				.style('fill', 'white')
+				.style('fill', clr_main)
 				.style('fill-opacity', 0.2)
 			;
    			svg.selectAll('circle')
@@ -184,32 +195,32 @@
 					if (el.Value === stat.min || el.Value === stat.max) {
 						return clr_highlight;
 					} else {
-						return 'white';
+						return clr_main;
 					}
 				})
-				//.style('stroke-opacity', 0.8)
-				//.style('fill', 'white')
 				.style('fill', function(el) { 
 					if (el.Value === stat.min || el.Value === stat.max) {
 						return clr_highlight;
 					} else {
-						return 'white';
+						return clr_main;
 					}
 				})
 				.on('mouseover', function(el) {		
-					div.transition().duration(200).style("opacity", .9);		
+					d3.select(this).attr('r', 7);
+					ttip.transition().duration(200).style("opacity", .9);		
 					var msg = formatDateShort(el.Date) + "<br/>"  + el.Value;
 					if (el.Value === stat.min) {
 						msg = "MIN value:<br/>" + msg
 					} else if (el.Value === stat.max) {
 						msg = "MAX value:<br/>" + msg
 					}
-					div.html(msg)
+					ttip.html(msg)
 						.style("left", (d3.event.pageX) + "px")		
 						.style("top", (d3.event.pageY - 28) + "px");	
 				})					
 				.on('mouseout', function(el) {
-					div.transition().duration(200).style("opacity", 0);	
+					d3.select(this).attr('r', 3);
+					ttip.transition().duration(200).style("opacity", 0);	
 				})
 			;
 			svg.selectAll('text')
@@ -224,46 +235,54 @@
 				.transition()
 				.duration(500)
 				.attr("x", function(el) { return scale_x(el.Date)-10; })
-				.attr("y", function(el) { return scale_y(y_min)+5; })
-				.attr("font-size", "9px")
+				.attr("y", function(el) { return scale_y(y_min)+10; })
+				.attr('font-size', '9px')
 				.style('fill', clr_highlight)
 				//.style('fill-opacity', 0.8)
 			;
 			if (!isNaN(comp_value)) {
 				// line to compare with
 				setTimeout(function() {
-					var lineBase = d3.svg.line()
-						.x(function(el) { return scale_x(el.Date); })
-						.y(function(el) { return scale_y(comp_value); });
-					svg.append('path')
-						.datum(data)
-						.attr('d', lineBase)
-						//.transition()
-						//.duration(500)
+					svg.append('line')
+						.attr({ x1: scale_x(stat.minDate), y1: scale_y(comp_value) ,
+								x2: scale_x(stat.maxDate), y2: scale_y(comp_value)
+						})
 						.style('stroke', 'yellow')
 						.style('stroke-opacity', 0.6)
 						.style('stroke-width', 1)
+						.on('mouseover', function(el) {		
+							d3.select(this).style('stroke-opacity', 0.9).style('stroke-width', 2)
+							ttip.transition().duration(200).style("opacity", .9);		
+							var msg = "Generally accepted standard is " + comp_value;
+							ttip.html(msg)
+								.style("left", (d3.event.pageX) + "px")		
+								.style("top", (d3.event.pageY - 28) + "px");	
+						})					
+						.on('mouseout', function(el) {
+							d3.select(this).style('stroke-opacity', 0.6).style('stroke-width', 1)
+							ttip.transition().duration(200).style("opacity", 0);	
+						})
 					;
 				}, 1000);
 			}
 
 			// text: last value and styles
+			if (title.length > 0) {
+				dest.select('.statcard-desc').text(title);
+			}
 			dest.select('.statcard-number').text(stat.last);
 			setTimeout(function() {
-				//var cl = 'statcard-info';
 				var bkg = clr_bkg_info;	// info
 				if (!isNaN(comp_value)) {
 					if ((comp_logic == -1 && stat.last < comp_value)
 						|| (comp_logic == 0 && stat.last == comp_value)
 						|| (comp_logic == 1 && stat.last > comp_value)) {
-						//cl = 'statcard-success';
-						bkg = '#1bc98e';
+						bkg = clr_bkg_success;
 					}
 					else if ((comp_logic == -1 && stat.last > comp_value)
 						|| (comp_logic == 0 && stat.last != comp_value)
 						|| (comp_logic == 1 && stat.last < comp_value)) {
-						//cl = 'statcard-danger';
-						bkg = '#e64759';
+						bkg = clr_bkg_danger;
 					}
 				}
 				
@@ -282,247 +301,215 @@
 					}
 					//$('#temp').html(bkg_elapsed);
 				}, 25);
-				//dest.classed(cl, true).transition().duration(3000);
 			}, 1000);
 		} // draw_Card
 
-		function draw_Statement(dest_id, data_type) {
-			// draws financial statement - raw data & growth rates
+		function draw_GrRates(dest_id, data_type, isClearFirst=false) {
+			// draws growth rates
 			// dest_id - destination element id
 			// data_type - data type to draw. Should be equal to HVTypeNames in the raw data file
 			var dest = d3.select('#' + dest_id);
 			if (dest == null)
 				return false;
 
+			var ttip = d3.select('#tooltip');	// tooltip placeholder
+			
+			// --- barchart drawing ---
+			var svg = dest.select('svg');
+			// clean it first for resize (re-draw) events - only when draw in a separate card
+			if (isClearFirst) {
+				svg.html('');
+			}
+
 			// get data ready
 			var data = get_RawData(data_type);
+			if (data == null || data.length == 0) {
+				// TODO: show text on a chart ONLY if there is no line chart already shown.
+				return true;
+			}
 			var stat = get_Stat(data);
 			var gr_rates = get_GrowthRates(data);
+			var gr_rates_stat = get_Stat(gr_rates);
+			if (gr_rates == null || gr_rates.length == 0) {
+				return true;
+			}
 			
-			var div = d3.select('#tooltip');	// tooltip placeholder
-			var formatDateShort = d3.time.format("%b %Y");	// https://github.com/d3/d3/wiki/Time-Formatting
-			
-			// --- sparkline drawing ---
-			var svg = dest.select('svg');
-			// clean it first for resize (re-draw) events
-			svg.html('');
-
-			var y_min = Math.min(0, stat.min);
-			var y_max = Math.max(0, stat.max);
+			var y_min = Math.min(0, isUndefOrNaN(gr_rates_stat.min) ? 0 : gr_rates_stat.min);
+			var y_max = Math.max(0, isUndefOrNaN(gr_rates_stat.max) ? 0 : gr_rates_stat.max);
 			var width = parseInt(window.getComputedStyle(svg[0][0],null).getPropertyValue("width"));
 			var height = parseInt(window.getComputedStyle(svg[0][0],null).getPropertyValue("height"));
 			svg.attr('width', width)
 				.attr('height', height)
 				.append('g')
-				.attr('transform', 'translate(10,10)');
+				.attr('transform', 'translate(' + margin + ',' + margin + ')');
 			;
-			if (data == null || data.length == 0 || isNaN(stat.last)) {
-				//dest.select('.statcard-number').text("unavailable");
-				// TODO: show text on a chart
-				return true;
-			}
-			
-			var clr_highlight = '#24ff24';
 			var scale_x = d3.scale.linear()
 				.domain(d3.extent(data, function(el) { return el.Date; }))
-				.range([10, width - 10]);
+				.range([margin, width - margin]);
 			var scale_y = d3.scale.linear()
-				.domain([y_min, y_max])	// d3.extent(data, function(el) { return el.Value; })
-				.range([height - 10, 10]);
-
-			var line = d3.svg.line()
-				//.interpolate("basis")
-				.x(function(el) { return scale_x(el.Date); })
-				.y(function(el) { return scale_y(el.Value); });
-			var area = d3.svg.area()
-				//.interpolate("basis")
-				.x(function(el) { return scale_x(el.Date); })
-				.y0(height)
-				.y1(function(el) { return scale_y(el.Value); });
-
-			svg.append('path')
-				.datum(data)
-				.transition()
-				.duration(500)
-				.attr('class', 'sparkline')
-				.attr('d', line)
-				.style('stroke', 'white')
-				.style('stroke-opacity', 0.8)
-				.style('stroke-width', 2)
-				.style('fill', 'none')
-			;
-			svg.append('path')
-				.datum(data)
-				.transition()
-				.duration(500)
-				.attr('class', 'sparkline')
-				.attr('d', area)
-				.style('stroke-width', 0)
-				.style('fill', 'white')
-				.style('fill-opacity', 0.2)
-			;
-   			svg.selectAll('circle')
-				.data(data)
+				.domain([y_min, y_max])
+				.range([height - margin, margin]);
+				
+			var barWidth = width / data.length - 10;
+   			svg.selectAll('rect')
+				.data(gr_rates)
 				.enter()
-				.append('circle')
-				.attr('cx', function(el) { return scale_x(el.Date); })
-				.attr('cy', function(el) { return scale_y(el.Value); })
-				.attr('r', 3)
-				.style('stroke', function(el) { 
-					if (el.Value === stat.min || el.Value === stat.max) {
-						return clr_highlight;
-					} else {
-						return 'white';
-					}
-				})
-				//.style('stroke-opacity', 0.8)
-				//.style('fill', 'white')
-				.style('fill', function(el) { 
-					if (el.Value === stat.min || el.Value === stat.max) {
-						return clr_highlight;
-					} else {
-						return 'white';
-					}
-				})
+				.append('rect')
+				.attr('x', function(el) { return scale_x(el.Date)-barWidth-4; })
+				.attr('y', function(el) { return (isNaN(el.Value) || el.Value < 0) ? scale_y(0)+1 : scale_y(el.Value)-1; })
+				.attr('height', function(el) { return isNaN(el.Value) ? 0 : Math.abs(scale_y(el.Value)-scale_y(0)); })
+				.attr('width', barWidth)
+				.attr('stroke', function(el) { return el.Value < 0 ? '#d43f3a' : 'white'; })
+				.style('stroke-opacity', 0.8)
+				.attr('fill', function(el) { return el.Value < 0 ? '#d43f3a' : 'white'; })
+				.style('fill-opacity', 0.4)
 				.on('mouseover', function(el) {		
-					div.transition().duration(200).style("opacity", .9);		
-					var msg = formatDateShort(el.Date) + "<br/>"  + el.Value;
-					if (el.Value === stat.min) {
-						msg = "MIN value:<br/>" + msg
-					} else if (el.Value === stat.max) {
-						msg = "MAX value:<br/>" + msg
-					}
-					div.html(msg)
+					d3.select(this).style('fill-opacity', 1);
+					ttip.transition().duration(200).style("opacity", .9);		
+					var msg = "Growth Rate for" + "<br/>" + formatDateShort(el.Date) + "<br/>" + el.Value + '%';
+					ttip.html(msg)
 						.style("left", (d3.event.pageX) + "px")		
 						.style("top", (d3.event.pageY - 28) + "px");	
 				})					
 				.on('mouseout', function(el) {
-					div.transition().duration(200).style("opacity", 0);	
+					d3.select(this).style('fill-opacity', 0.6);
+					ttip.transition().duration(200).style("opacity", 0);	
 				})
 			;
-			svg.selectAll('text')
-				.data(data)
-				.enter()
-				.append('text')
-				.text(function(el) { return el.Date.getUTCFullYear(); })	// all dates
-				.transition()
-				.duration(500)
-				.attr("x", function(el) { return scale_x(el.Date)-10; })
-				.attr("y", function(el) { return scale_y(y_min)+5; })
-				.attr("font-size", "9px")
-				.style('fill', clr_highlight)
-				//.style('fill-opacity', 0.8)
+/*
+			// x axis
+			var scale_xt = d3.time.scale()
+				.domain([gr_rates_stat.minDate, gr_rates_stat.maxDate])	// need raw start and end dates	-1000*60*60*24*365*2
+				.range([margin, width - 2*margin]);
+			var axis_x = d3.svg.axis()
+				.scale(scale_xt)
+				.orient('bottom')
+				.tickSize(3)
+				//.ticks(5)
+				.tickFormat(d3.time.format("%Y"))
 			;
-			
-			// draw GrowthRate: scale_x remains the same
-			if (gr_rates != null && gr_rates.length > 0) {
-//debugger;			
-				var h = height/2;
-				var svg = dest.append('svg')
-					.attr('width', width)
-					.attr('height', h)
-					.attr('class', 'sparkline')
-					.append('g')
-					.attr('transform', 'translate(10,10)');
-				scale_y = d3.scale.linear()
-					.domain(d3.extent(gr_rates, function(el) { return el.Value; }))
-					.range([h, 10]);
-/*
-				var lineBase = d3.svg.line()
-					.x(function(el) { return scale_x(el.Date); })
-					.y(function(el) { return scale_y(0); });
-				svg.append('path')
-					.datum(gr_rates)
-					.attr('d', lineBase)
-					//.transition()
-					//.duration(500)
-					.style('stroke', 'yellow')
-					.style('stroke-opacity', 0.6)
-					.style('stroke-width', 1)
-				;
+			svg.selectAll('g')
+				.attr('class', 'x axis')
+				.attr('transform', 'translate(' + margin + ',' + (height-margin) + ')')
+				.call(axis_x);
 */
-				var barWidth = 20;
-				var bar = svg.selectAll("g")
-					.data(gr_rates)
-					.enter()//.append("g")
-					//.attr('transform', 'translate(0,0)');
 
-					.append('rect')
-					.attr('x', function(el) { return scale_x(el.Date); })
-					.attr('y', function(el) { return scale_y(el.Value); })
-					.attr('height', function(el) { return Math.abs(scale_y(el.Value) - scale_y(0)); })
-					.attr('width', barWidth)
+			// zero line - must be based on data and stat (growth rates have 1 year less)
+			if (isUndefOrNaN(gr_rates_stat.min) == false) {
+				svg.append('line')
+					.attr({ x1: scale_x(stat.minDate), y1: scale_y(0) ,
+							x2: scale_x(stat.maxDate), y2: scale_y(0)
+					})
+					.style('stroke', 'black')
+					.style('stroke-opacity', 0.45)
+					.style('stroke-width', 0.5)
 				;
-/*
-				bar.append("text")
-					.attr("x", barWidth / 2)
-					.attr("y", function(el) { return scale_y(el.Value) + 3; })
-					.attr("dy", ".75em")
-					.text(function(el) { return el.Value; });
-*/					
 			}
-		} // draw_Statement
+		} // draw_GrRates
 		
-		function redraw() {
+		function draw_Statement(card_id, gr_rates_id, item_type, item_title) {
+			draw_Card(dest_id=card_id, data_type=item_type, comp_value=NaN, comp_logic=0, title=item_title);
+			setTimeout(function() {
+				draw_GrRates(dest_id=card_id, data_type=item_type, isClearFirst=false);
+			}, 1000);
+		}
+		
+		function redraw(isDrawStatement=true, isDrawRatios=true) {
 			// draws all charts on the page, fin_data must be populated
 			var maxDate = d3.max(fin_data, function(el){return el.Date;});
-			if (maxDate !== undefined && maxDate !== NaN) {
+			if (!isUndefOrNaN(maxDate)) {
 				var formatDate = d3.time.format("%B %Y");
 				$('.dashhead-subtitle').html('Annual Financial Statements as of <b>' + formatDate(maxDate) + '</b>');
 			}
 			
-			// --- Fin Statements - selected 
-			var selectSt = $('#sel_IncomeSt').val();
-			draw_Statement('card_IncomeSt', selectSt);
-/*			
-			selectSt = $('#sel_CashFlowSt').val();
-			draw_Statement('card_CashFlowSt', selectSt);
+			if (isDrawStatement) {
+				// --- Fin Statements - selected 
+				draw_Statement(card_id='card_IncomeSt', gr_rates_id='card_IncomeStGrRates', item_type=$('#sel_IncomeSt').val(), item_title=$('#sel_IncomeSt option:selected').text());
+				draw_Statement(card_id='card_CashFlowSt', gr_rates_id='card_CashFlowStGrRates', item_type=$('#sel_CashFlowSt').val(), item_title=$('#sel_CashFlowSt option:selected').text());
+				draw_Statement(card_id='card_BalanceSh', gr_rates_id='card_BalanceShGrRates', item_type=$('#sel_BalanceSh').val(), item_title=$('#sel_BalanceSh option:selected').text());
+			}
 			
-			selectSt = $('#sel_BalanceSh').val();
-			draw_Statement('card_BalanceSh', selectSt);
-*/			
-			// --- draw_Card(dest_id, data_type, comp_value, comp_logic) {
-			// dest_id - destination element id
-			// data_type - data type to draw. Should be equal to HVTypeNames in the raw data file
-			// comp_value - value to compare with. set to NaN if no comparison needed.
-			// comp_logic: -1, 0, 1. Where -1 - less then; 0 - equals to; 1 - greater than.
-			
-			// Liquidity Ratios
-			draw_Card('card_RatioCurrent', 'Ann_CurRatio', 2, 1);
-			draw_Card('card_RatioQuick', 'Ann_QuickRatio', 1, 1);
-			draw_Card('card_RatioLeverage', 'Ann_Leverage', NaN, 0);
-			
-			// Profitability Ratios
-			draw_Card('card_ROA', 'Ann_ROA', 15, 1);
-			draw_Card('card_ROE', 'Ann_ROE', 15, 1);
-			draw_Card('card_ROIC', 'Ann_ROIC', 15, 1);
-
-			// Other 
-			//draw_Card('card_avgPE', 'Ann_PEAvg', 14, -1);
-			//draw_Card('card_EPS', 'Ann_EPS', NaN, 0);
-			//draw_Card('card_GrossProfit', 'Ann_GrossProfit', NaN, 0);
-			
-//debugger;
+			if (isDrawRatios) {
+				// comp_value - value to compare with. set to NaN if no comparison needed.
+				// comp_logic: -1, 0, 1. Where -1 - less then; 0 - equals to; 1 - greater than.
+				// Liquidity Ratios
+				draw_Card(dest_id='card_RatioCurrent', data_type='Ann_CurRatio', comp_value=2, comp_logic=1);
+				draw_Card(dest_id='card_RatioQuick', data_type='Ann_QuickRatio', comp_value=1, comp_logic=1);
+				draw_Card(dest_id='card_RatioLeverage', data_type='Ann_Leverage', comp_value=NaN, comp_logic=0);
+				
+				// Profitability Ratios
+				draw_Card(dest_id='card_ROA', data_type='Ann_ROA', comp_value=15, comp_logic=1);
+				draw_Card(dest_id='card_ROE', data_type='Ann_ROE', comp_value=15, comp_logic=1);
+				draw_Card(dest_id='card_ROIC', data_type='Ann_ROIC', comp_value=15, comp_logic=1);
+			}
 		} // redraw
 		
-		function draw(data) {
+		function draw(data, isDrawStatement=true, isDrawRatios=true) {
 			fin_data = data;
 			var parseDate = d3.time.format("%Y-%m-%d").parse;
 			fin_data.forEach(function(el) {
 				el.Date = parseDate(el.Date);
 				el.Value = +el.Value;
 			});
-			redraw();
+			redraw(isDrawStatement, isDrawRatios);
 		}
 		
-		function draw_Stock(stock_name) {
+		function draw_Stock(stock_name, isDrawStatement=true, isDrawRatios=true) {
 			var stock = stock_name.split(":");
 			$('.dashhead-title').html(stock[1] + " (" + stock[0] + ")");
 			// load data and draw charts
-			d3.csv("/data/" + stock[0] + "_FinStatements_Ann.csv", draw);
+			d3.csv("/data/" + stock[0] + "_FinStatements_Ann.csv", function(data) {
+				draw(data, isDrawStatement, isDrawRatios);
+			});
 			$('html, body').animate({ scrollTop: 0 }, 'fast');
 			return true;
 		}
+		
+		function draw_animation(stock_name) {
+			// 1. hide 
+			d3.select('#finSt_Hdr').style("opacity", 0);	
+			d3.select('#finSt_Row').style("opacity", 0);
+			d3.select('#ratioLiq_Hdr').style("opacity", 0);	
+			d3.select('#ratioLiq_Row').style("opacity", 0);
+			d3.select('#ratioProf_Hdr').style("opacity", 0);	
+			d3.select('#ratioProf_Row').style("opacity", 0);
+ 
+			draw_Stock(stock_name=stock_name, isDrawStatement=false, isDrawRatios=false); // show stock name
+			var ttip = d3.select('#tooltip');
+			
+			var step = 0;
+			var maxStep = 6;
+			var interval = setInterval(function(){
+				step += 1;
+				if (step > maxStep) {
+					clearInterval(interval);
+					//alert('Animation is done.');
+				}
+			
+				if (step == 1) {
+					d3.select('#finSt_Hdr').transition().duration(500).style("opacity", 1);
+					d3.select('#finSt_Row').transition().duration(500).style("opacity", 1);
+				} else if (step == 2) {
+					ttip.html("<b>Line shows absolute values</b>").style("left", "100px").style("top", $('#finSt_Row').offset().top + 'px');
+					ttip.transition().duration(200).style("opacity", .9);
+				} else if (step == 3) {
+					draw_Stock(stock_name=stock_name, isDrawStatement=true, isDrawRatios=false);
+				} else if (step == 4) {
+					ttip.transition().duration(200).style("opacity", 0);
+					ttip.html("<b>Bar chart shows Year-Over-Year Growth Rate</b>").style("left", "200px");	
+					ttip.transition().duration(200).style("opacity", .9);
+				} else if (step == 5) {
+					d3.select('#ratioLiq_Hdr').style("opacity", 1);	
+					d3.select('#ratioLiq_Row').style("opacity", 1);
+					d3.select('#ratioProf_Hdr').style("opacity", 1);	
+					d3.select('#ratioProf_Row').style("opacity", 1);
+					redraw(isDrawStatement=false, isDrawRatios=true);
+				} else if (step == 6) {
+					ttip.transition().duration(200).style("opacity", 0);				
+					$('html, body').animate({ scrollTop: $('#ratioLiq_Hdr').offset().top + 'px' }, 'slow');
+				}
+			}, 1200);
+		} // draw_animation
 	</script>
 </head>
 <body>
@@ -537,13 +524,23 @@
 			</div>
 		</header>
 
-		<div class="hr-divider m-t-md m-b">
+		<div id="intro" class="bg-info p-a">
+			<p>
+				On a charts below the Line shows absolute values and the Bar chart shows Year-Over-Year Growth Rate for selected financial statement item. 
+				A consistent GROWTH is generally considered necessary to fund future growth from within a business.
+				<br />
+				<b>NOTE:</b> Percent change is not provided if either the latest period or the year-ago period contains a net loss. 
+				(source: <a href="http://www.wsj.com/public/resources/documents/doe-help.htm" target="_blank">WSJ Digest of Earnings</a>)
+			</p>
+		</div>
+
+		<div id="finSt_Hdr" class="hr-divider m-t-md m-b">
 			<h3 class="hr-divider-content hr-divider-heading">Financial Statements</h3>
 		</div>
-		<div class="row">
+		<div id="finSt_Row" class="row">
 			<div class="col-md-4">
 				<h4>Income Statement</h4>
-				<select id="sel_IncomeSt" class="form-control" onchange="draw_Statement('card_IncomeSt', this.value);">
+				<select id="sel_IncomeSt" class="form-control" onchange="draw_Statement('card_IncomeSt', 'card_IncomeStGrRates', this.value, $('#sel_IncomeSt option:selected').text());">
 					<option value="Ann_Revenue">Total Revenue (Sales)</option>
 					<option value="Ann_GrossProfit">Gross Profit</option>
 					<option value="Ann_IncomeOp">Operation Income</option>
@@ -551,32 +548,58 @@
 					<option value="Ann_IncomeAfterTax">Income After Tax</option>
 					<option value="Ann_IncomeNet">Net Income</option>
 					<option value="Ann_EPS" selected="selected">Earnings Per Share (EPS)</option>
-					<option value="Ann_RND">Research & Development (R&D)</option>
-					<option value="Ann_PEAvg">Average Price per Earnings (PE)</option>
+					<option value="Ann_RND">Research & Development</option>
+					<option value="Ann_PEAvg">Average PE</option>
 				</select>
 				<br />
 				<div id="card_IncomeSt" class="statcard statcard-info">
+					<div class="p-a">
+						<span class="statcard-desc"></span>
+						<h3 class="statcard-number"></h3>
+						<hr class="statcard-hr m-b-0" />
+					</div>
 					<svg class="sparkline"></svg>
 				</div>
+<!--				
+				<div id="card_IncomeStGrRates" class="statcard statcard-info" style="margin-top: 5px !important;">
+					<div class="p-a">
+						<span class="statcard-desc">Growth Rates</span>
+					</div>
+					<svg class="sparkline"></svg>
+				</div>
+-->				
 			</div>
 			<div class="col-md-4">
 				<h4>Cash Flow Statement</h4>
-				<select id="sel_CashFlowSt" class="form-control">
-					<option value="Ann_CashFromOA">Cash From Operating Activities</option>
+				<select id="sel_CashFlowSt" class="form-control" onchange="draw_Statement('card_CashFlowSt', 'card_CashFlowStGrRates', this.value, $('#sel_CashFlowSt option:selected').text());">
+					<option value="Ann_CashFromOA">Cash From Operating</option>
 					<option value="Ann_CapExp">Capital Expenditures</option>
 					<option value="Ann_CashDiv">Cash Dividends</option>
 					<option value="Ann_FCF">Free Cash Flow</option>
 					<option value="Ann_FCFShare" selected="selected">Free Cash Flow per Share</option>
-					<option value="Ann_SalePurchStock">Sale Purchase of Stock</option>
+					<option value="Ann_SalePurchStock">Sale/Purchase of Stock</option>
 				</select>
 				<br />
 				<div id="card_CashFlowSt" class="statcard statcard-info">
+					<div class="p-a">
+						<span class="statcard-desc"></span>
+						<h3 class="statcard-number"></h3>
+						<hr class="statcard-hr m-b-0" />
+					</div>
 					<svg class="sparkline"></svg>
 				</div>
-			</div>
+<!--				
+				<div id="card_CashFlowStGrRates" class="statcard statcard-info" style="margin-top: 5px !important;">
+					<div class="p-a">
+						<span class="statcard-desc">Growth Rates</span>
+					</div>
+					<svg class="sparkline"></svg>
+				</div>
+-->
+				</div>
 			<div class="col-md-4">
 				<h4>Balance Sheet</h4>
-				<select id="sel_BalanceSh" class="form-control">
+				<select id="sel_BalanceSh" class="form-control" onchange="draw_Statement('card_BalanceSh', 'card_BalanceShGrRates', this.value, $('#sel_BalanceSh option:selected').text());">
 					<option value="Ann_AcctsReceivable">Accounts Receivable</option>
 					<option value="Ann_AcctsPayable">Accounts Payable</option>
 					<option value="Ann_Inventory">Inventory</option>
@@ -592,20 +615,33 @@
 				</select>
 				<br />
 				<div id="card_BalanceSh" class="statcard statcard-info">
+					<div class="p-a">
+						<span class="statcard-desc"></span>
+						<h3 class="statcard-number"></h3>
+						<hr class="statcard-hr m-b-0" />
+					</div>
 					<svg class="sparkline"></svg>
 				</div>
+<!--				
+				<div id="card_BalanceShGrRates" class="statcard statcard-info" style="margin-top: 5px !important;">
+					<div class="p-a">
+						<span class="statcard-desc">Growth Rates</span>
+					</div>
+					<svg class="sparkline"></svg>
+				</div>
+-->				
 			</div>
 		</div>
 		
-		<div class="hr-divider m-t-md m-b">
+		<div id="ratioLiq_Hdr" class="hr-divider m-t-md m-b">
 			<h3 class="hr-divider-content hr-divider-heading">Liquidity Ratios</h3>
 		</div>
-		<div class="row">
+		<div id="ratioLiq_Row" class="row">
 			<div class="col-md-4">
 				<div id="card_RatioCurrent" class="statcard statcard-info">
 					<div class="p-a">
 						<span class="statcard-desc">Current Ratio</span>
-						<h2 class="statcard-number"></h2>
+						<h3 class="statcard-number"></h3>
 						<hr class="statcard-hr m-b-0" />
 					</div>
 					<svg id="spark_RatioCurrent" class="sparkline"></svg>
@@ -618,7 +654,7 @@
 				<div id="card_RatioQuick" class="statcard statcard-info">
 					<div class="p-a">
 						<span class="statcard-desc">Quick Ratio</span>
-						<h2 class="statcard-number"></h2>
+						<h3 class="statcard-number"></h3>
 						<hr class="statcard-hr m-b-0" />
 					</div>
 					<svg id="spark_RatioQuick" class="sparkline"></svg>
@@ -631,7 +667,7 @@
 				<div id="card_RatioLeverage" class="statcard statcard-info">
 					<div class="p-a">
 						<span class="statcard-desc">Financial Leverage</span>
-						<h2 class="statcard-number"></h2>
+						<h3 class="statcard-number"></h3>
 						<hr class="statcard-hr m-b-0" />
 					</div>
 					<svg id="spark_RatioLeverage" class="sparkline"></svg>
@@ -642,16 +678,18 @@
 			</div>
 		</div>
 
-		<div class="hr-divider m-t-md m-b">
-			<h3 class="hr-divider-content hr-divider-heading">Profitability Ratios</h3>
+		<div id="ratioProf_Hdr">
+			<div class="hr-divider m-t-md m-b">
+				<h3 class="hr-divider-content hr-divider-heading">Profitability Ratios</h3>
+			</div>
+			<p class="bg-warning p-a">A return on profitability ratios of <b>15%</b> is generally considered necessary to fund future growth from within a business.</p>
 		</div>
-		<p>A return on profitability ratios of <b>15%</b> is generally considered necessary to fund future growth from within a business.</p>
-		<div class="row">
+		<div id="ratioProf_Row" class="row">
 			<div class="col-md-4">
 				<div id="card_ROA" class="statcard statcard-info">
 					<div class="p-a">
 						<span class="statcard-desc">ROA</span>
-						<h2 class="statcard-number"></h2>
+						<h3 class="statcard-number"></h3>
 						<hr class="statcard-hr m-b-0" />
 					</div>
 					<svg id="spark_ROA" class="sparkline"></svg>
@@ -664,7 +702,7 @@
 				<div id="card_ROE" class="statcard statcard-info">
 					<div class="p-a">
 						<span class="statcard-desc">ROE</span>
-						<h2 class="statcard-number"></h2>
+						<h3 class="statcard-number"></h3>
 						<hr class="statcard-hr m-b-0" />
 					</div>
 					<svg id="spark_ROE" class="sparkline"></svg>
@@ -678,7 +716,7 @@
 				<div id="card_ROIC" class="statcard statcard-info">
 					<div class="p-a">
 						<span class="statcard-desc">ROIC</span>
-						<h2 class="statcard-number"></h2>
+						<h3 class="statcard-number"></h3>
 						<hr class="statcard-hr m-b-0" />
 					</div>
 					<svg id="spark_ROIC" class="sparkline"></svg>
@@ -689,71 +727,31 @@
 			</div>
 		</div>
 		
-		<div class="hr-divider m-t-md m-b">
-			<h3 class="hr-divider-content hr-divider-heading">Other</h3>
-		</div>
-		<div class="row">
-			<div class="col-md-4">
-				<div id="card_avgPE" class="statcard statcard-info">
-					<div class="p-a">
-						<span class="statcard-desc">Average PE Ratio</span>
-						<h2 class="statcard-number"></h2>
-						<hr class="statcard-hr m-b-0" />
-					</div>
-					<svg id="spark_AvgPE" class="sparkline"></svg>
-				</div>
-				<p class="muted">
-					The PE ratio (price-to-earnings ratio) is a financial ratio used for valuation: a higher PE ratio means that investors are paying more 
-					for each unit of net income, so the stock is more expensive compared to one with lower PE ratio. The average U.S. equity PE ratio from 
-					1900 to 2005 is 14.
-				</p>
-			</div>
-			<div class="col-md-4">
-				<div id="card_EPS" class="statcard statcard-info">
-					<div class="p-a">
-						<span class="statcard-desc">EPS</span>
-						<h2 class="statcard-number"></h2>
-						<hr class="statcard-hr m-b-0" />
-					</div>
-					<svg id="spark_EPS" class="sparkline"></svg>
-				</div>
-				<p class="muted"></p>
-			</div>
-			<div class="col-md-4">
-				<div id="card_GrossProfit" class="statcard statcard-info">
-					<div class="p-a">
-						<span class="statcard-desc">Gross Profit</span>
-						<h2 class="statcard-number"></h2>
-						<hr class="statcard-hr m-b-0" />
-					</div>
-					<svg id="spark_GrossProfit" class="sparkline"></svg>
-				</div>
-				<p class="muted"></p>
-			</div>
-		</div>
-
 		<hr />
-		<h4>Test & Debug Section</h4>
-		<p>This visualization is designed to show a single stock data. However, for testing purposes you may select one of the other few stocks available below. 
-		Note that TEST stock (Test Corp.) is added for missing data testing – we should not expect that all data will always be available for all stocks, therefore 
-		this page should be able to handle missing data issues.</p>
-		<h4>Select stock for analysis:</h4>
-		<select class="form-control" onchange="draw_Stock(this.value);">
-			<option value="AAPL:Apple Inc." selected="selected">Apple Inc.</option>
-			<option value="GOOGL:Alphabet Inc.">Alphabet Inc.</option>
-			<option value="MSFT:Microsoft Corporation">Microsoft Corporation</option>
-			<option value="ORCL:Oracle Corporation">Oracle Corporation</option>
-			<option value="TEST:Test Corp.">Test Corp.</option>
-		</select>
+		<div>
+			<h4>Test & Debug Section</h4>
+			<p>This visualization is designed to show a single stock data. However, for testing purposes, you may select one of the other few stocks available below. 
+			Note that TEST stock (Test Corp.) is added for missing data testing – we should not expect that all data will always be available for all stocks, therefore 
+			this page should be able to handle missing data issues.</p>
+			<h4>Select stock for analysis:</h4>
+			<select class="form-control" onchange="draw_Stock(this.value);">
+				<option value="AAPL:Apple Inc." selected="selected">Apple Inc.</option>
+				<option value="GOOGL:Alphabet Inc.">Alphabet Inc.</option>
+				<option value="MSFT:Microsoft Corporation">Microsoft Corporation</option>
+				<option value="ORCL:Oracle Corporation">Oracle Corporation</option>
+				<option value="TSLA:Tesla Motors Inc.">Tesla Motors Inc.</option>
+				<option value="TEST:Test Corp.">Test Corp.</option>
+			</select>
+		</div>
 		<hr />
 		<h4>References</h4>
 		<ul>
-			<li>http://www.visualcinnamon.com/2015/11/learnings-from-a-d3-js-addict-on-starting-with-canvas.html</li>
-			<li>https://bocoup.com/weblog/d3js-and-canvas</li>
-			<li>http://www.tnoda.com/blog/2013-12-19</li>
-			<li>https://github.com/d3/d3/wiki/Time-Formatting</li>
-			<li>http://bl.ocks.org/d3noob/a22c42db65eb00d4e369</li>
-			<li>http://stackoverflow.com/questions/13728402/what-is-the-difference-d3-datum-vs-data</li>
+			<li><a target="_blank" href="http://www.visualcinnamon.com/2015/11/learnings-from-a-d3-js-addict-on-starting-with-canvas.html">http://www.visualcinnamon.com/2015/11/learnings-from-a-d3-js-addict-on-starting-with-canvas.html</a></li>
+			<li><a target="_blank" href="https://bocoup.com/weblog/d3js-and-canvas">https://bocoup.com/weblog/d3js-and-canvas</a></li>
+			<li><a target="_blank" href="http://www.tnoda.com/blog/2013-12-19">http://www.tnoda.com/blog/2013-12-19</a></li>
+			<li><a target="_blank" href="https://github.com/d3/d3/wiki/Time-Formatting">https://github.com/d3/d3/wiki/Time-Formatting</a></li>
+			<li><a target="_blank" href="http://bl.ocks.org/d3noob/a22c42db65eb00d4e369">http://bl.ocks.org/d3noob/a22c42db65eb00d4e369</a></li>
+			<li><a target="_blank" href="http://stackoverflow.com/questions/13728402/what-is-the-difference-d3-datum-vs-data">http://stackoverflow.com/questions/13728402/what-is-the-difference-d3-datum-vs-data</a></li>
 		</ul>
 		<footer>
 			<hr />
@@ -765,13 +763,10 @@
 
 	<script type="text/javascript">
 		$(function () {
-			// bootstrap
-			//$('[data-toggle="popover"]').popover();
 			window.addEventListener('resize', resize, false);
 		});
 		// load data and draw charts for the first time
-		//d3.csv("/data/AAPL_FinStatements_Ann.csv", draw);
-		draw_Stock('AAPL:Apple Inc.');
+		draw_animation('AAPL:Apple Inc.');
 	</script>
 
 </body>
