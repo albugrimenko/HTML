@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>P6: Data Visualization</title>
+	
+	<link rel="stylesheet" href="/css/bootstrap.min.css" media="screen">
+	<link rel="stylesheet" href="/css/statcard.css" media="screen">
+	<style>
+		.muted, .muted a {opacity: .6; font-size: 80%;}
+		.sparkline {
+		  /* border: 1px solid yellow; */
+		  height:100%;
+		  width:100%;
+		}
+		div.tooltip {
+			position: absolute;
+			text-align: left;
+			padding: 6px;				
+			background: yellow;	
+			border: 0px;		
+			border-radius: 8px;			
+			pointer-events: none;			
+		}
+	</style>
+
+	<script type="text/javascript" src="/js/jquery.min.js"></script>
+    <script type="text/javascript" src="/js/bootstrap.min.js"></script>
+
+	<script src="/js/d3.min.js"></script>
+	<script type="text/javascript">
+		// helper functions
+		function resize() {
+			var card = document.getElementById('card_RatioCurrent');	//  $('#card_RatioCurrent');
+			var width = parseInt(window.getComputedStyle(card,null).getPropertyValue("width"));
+			var height = parseInt(window.getComputedStyle(card,null).getPropertyValue("height"));
+			$('#temp').html('Card size: ' + width + ' x ' + height);
+
+			redraw();
+			/*
+			// change size of all sparklines
+			var spLines = $('.sparkline');
+			for(var i=0; i < spLines.length; i++) {
+				spLines[i].setAttribute('width', width);
+				spLines[i].setAttribute('height', Math.floor(height*0.5));
+			}
+			*/
+		};
+	</script>
+	<script type="text/javascript">
+		var fin_data = [];	// globally accessible
+	
+		function get_RawData(dtype) {
+			return fin_data.filter(function(el) {
+				return (el.HVTypeName == dtype);
+			});
+		}
+		function get_Stat(filteredData) {
+			if (filteredData == null || filteredData.length == 0) {
+				return {
+					'min' : NaN,
+					'max' : NaN,
+					'last' : NaN
+				};
+			}
+			//var minValue = Math.min.apply(Math, filteredData.map(function(el){return el.Value;})),
+			//	maxValue = Math.max.apply(Math, filteredData.map(function(el){return el.Value;}));
+			var minValue = d3.min(filteredData, function(el){return el.Value;}),
+				maxValue = d3.max(filteredData, function(el){return el.Value;});
+			return {
+				'min' : minValue,
+				'max' : maxValue,
+				'last' : filteredData[0].Value
+			};
+		}
+		
+		function draw_Card(dest_id, data, stat, comp_value, comp_logic) {
+			// dest_id - destination element id
+			// data - raw data to draw. Two attributes must be presented for each element: Date, Value
+			// stat - basic statistics about the raw data (use function get_Stat)
+			// comp_value - value to compare with. set to NaN if no comparison needed.
+			// comp_logic: -1, 0, 1. Where -1 - less then; 0 - equals to; 1 - greater than.
+			var dest = d3.select('#' + dest_id);
+			if (dest == null)
+				return false;
+
+			var bkg_info = "#9f86ff";
+			var div = d3.select('#tooltip');	// tooltip placeholder
+			var formatDateShort = d3.time.format("%b %Y");	// https://github.com/d3/d3/wiki/Time-Formatting
+			
+			// --- sparkline drawing ---
+			var svg = dest.select('svg');
+			// clean it first for resize (re-draw) events
+			svg.html('');
+			dest.select('.statcard-number').text("");
+			dest.style('background-color', bkg_info); 
+			
+			var y_min = Math.min(0, stat.min, isNaN(comp_value) ? 0 : comp_value*1.01);
+			var y_max = Math.max(0, stat.max, isNaN(comp_value) ? 0 : comp_value*1.01);
+			var width = parseInt(window.getComputedStyle(svg[0][0],null).getPropertyValue("width"));
+			var height = parseInt(window.getComputedStyle(svg[0][0],null).getPropertyValue("height"));
+			svg.attr('width', width)
+				.attr('height', height)
+				.append('g')
+				.attr('transform', 'translate(10,10)');
+			;
+			if (data == null || data.length == 0 || isNaN(stat.last)) {
+				dest.select('.statcard-number').text("unavailable");
+				return true;
+			}
+			
+			var scale_x = d3.scale.linear()
+				.domain(d3.extent(data, function(el) { return el.Date; }))
+				.range([10, width - 10]);
+			var scale_y = d3.scale.linear()
+				.domain([y_min, y_max])	// d3.extent(data, function(el) { return el.Value; })
+				.range([height - 10, 10]);
+
+			var line = d3.svg.line()
+				//.interpolate("basis")
+				.x(function(el) { return scale_x(el.Date); })
+				.y(function(el) { return scale_y(el.Value); });
+			var area = d3.svg.area()
+				//.interpolate("basis")
+				.x(function(el) { return scale_x(el.Date); })
+				.y0(height)
+				.y1(function(el) { return scale_y(el.Value); });
+
+			svg.append('path')
+				.datum(data)
+				.transition()
+				.duration(500)
+				.attr('class', 'sparkline')
+				.attr('d', line)
+				.style('stroke', 'white')
+				.style('stroke-opacity', 0.8)
+				.style('stroke-width', 2)
+				.style('fill', 'none')
+			;
+			svg.append('path')
+				.datum(data)
+				.transition()
+				.duration(500)
+				.attr('class', 'sparkline')
+				.attr('d', area)
+				.style('stroke-width', 0)
+				.style('fill', 'white')
+				.style('fill-opacity', 0.2)
+			;
+   			svg.selectAll('circle')
+				.data(data)
+				.enter()
+				.append('circle')
+				.attr('cx', function(el) { return scale_x(el.Date); })
+				.attr('cy', function(el) { return scale_y(el.Value); })
+				.attr('r', 3)
+				.style('stroke', function(el) { 
+					if (el.Value === stat.min || el.Value === stat.max) {
+						return '#24ff24';
+					} else {
+						return 'white';
+					}
+				})
+				//.style('stroke-opacity', 0.8)
+				//.style('fill', 'white')
+				.style('fill', function(el) { 
+					if (el.Value === stat.min || el.Value === stat.max) {
+						return '#24ff24';
+					} else {
+						return 'white';
+					}
+				})
+				.on('mouseover', function(el) {		
+					div.transition().duration(200).style("opacity", .9);		
+					var msg = formatDateShort(el.Date) + "<br/>"  + el.Value;
+					if (el.Value === stat.min) {
+						msg = "MIN value:<br/>" + msg
+					} else if (el.Value === stat.max) {
+						msg = "MAX value:<br/>" + msg
+					}
+					div.html(msg)
+						.style("left", (d3.event.pageX) + "px")		
+						.style("top", (d3.event.pageY - 28) + "px");	
+				})					
+				.on('mouseout', function(el) {
+					div.transition().duration(200).style("opacity", 0);	
+				})
+			;
+			svg.selectAll('text')
+				.data(data)
+				.enter()
+				.append('text')
+				.text(function(el) { 
+					if (el.Value === stat.min || el.Value === stat.max) {
+						return el.Date.getUTCFullYear(); 
+					}
+				})
+				.transition()
+				.duration(500)
+				.attr("x", function(el) { return scale_x(el.Date)-10; })
+				.attr("y", function(el) { return scale_y(y_min)+5; })
+				.attr("font-size", "9px")
+				.style('fill', '#24ff24')
+				//.style('fill-opacity', 0.8)
+			;
+			if (!isNaN(comp_value)) {
+				// line to compare with
+				setTimeout(function() {
+					var lineBase = d3.svg.line()
+						.x(function(el) { return scale_x(el.Date); })
+						.y(function(el) { return scale_y(comp_value); });
+					svg.append('path')
+						.datum(data)
+						.attr('d', lineBase)
+						//.transition()
+						//.duration(500)
+						.style('stroke', 'yellow')
+						.style('stroke-opacity', 0.6)
+						.style('stroke-width', 1)
+					;
+				}, 1000);
+			}
+
+			// text: last value and styles
+			dest.select('.statcard-number').text(stat.last);
+			setTimeout(function() {
+				//var cl = 'statcard-info';
+				var bkg = bkg_info;	// info
+				if (!isNaN(comp_value)) {
+					if ((comp_logic == -1 && stat.last < comp_value)
+						|| (comp_logic == 0 && stat.last == comp_value)
+						|| (comp_logic == 1 && stat.last > comp_value)) {
+						//cl = 'statcard-success';
+						bkg = '#1bc98e';
+					}
+					else if ((comp_logic == -1 && stat.last > comp_value)
+						|| (comp_logic == 0 && stat.last != comp_value)
+						|| (comp_logic == 1 && stat.last < comp_value)) {
+						//cl = 'statcard-danger';
+						bkg = '#e64759';
+					}
+				}
+				
+				var bkg_scale = d3.scale.linear()
+					.domain([0, 5000])
+					.range([bkg_info, bkg]);
+				var bkg_elapsed = 0;
+				var bkg_max = d3.max(bkg_scale.domain());
+				var bkg_interval = setInterval(function(){
+					bkg_elapsed += 50;	// step
+					if (bkg_elapsed <= bkg_max) {
+						dest.style('background-color', bkg_scale(bkg_elapsed));
+					}
+					else {
+						clearInterval(bkg_interval);
+					}
+					//$('#temp').html(bkg_elapsed);
+				}, 25);
+				//dest.classed(cl, true).transition().duration(3000);
+			}, 1000);
+		} // draw_Card
+			
+		function redraw() {
+			// draws all charts on the page, fin_data must be populated
+			var maxDate = d3.max(fin_data, function(el){return el.Date;});
+			if (maxDate !== undefined && maxDate !== NaN) {
+				var formatDate = d3.time.format("%B %Y");
+				$('.dashhead-subtitle').html('Annual Financial Statements as of <b>' + formatDate(maxDate) + '</b>');
+			}
+			
+			var dataRaw, dataStat;
+			// Liquidity Ratios
+			dataRaw = get_RawData('Ann_CurRatio');
+			dataStat = get_Stat(dataRaw);
+			draw_Card('card_RatioCurrent', dataRaw, dataStat, 2, 1);
+			
+			dataRaw = get_RawData('Ann_QuickRatio');
+			dataStat = get_Stat(dataRaw);
+			draw_Card('card_RatioQuick', dataRaw, dataStat, 1, 1);
+			
+			dataRaw = get_RawData('Ann_Leverage');
+			dataStat = get_Stat(dataRaw);
+			draw_Card('card_RatioLeverage', dataRaw, dataStat, NaN, 0);
+			
+			// Profitability Ratios
+			dataRaw = get_RawData('Ann_ROA');
+			dataStat = get_Stat(dataRaw);
+			draw_Card('card_ROA', dataRaw, dataStat, 15, 1);
+			
+			dataRaw = get_RawData('Ann_ROE');
+			dataStat = get_Stat(dataRaw);
+			draw_Card('card_ROE', dataRaw, dataStat, 15, 1);
+
+			dataRaw = get_RawData('Ann_ROIC');
+			dataStat = get_Stat(dataRaw);
+			draw_Card('card_ROIC', dataRaw, dataStat, 15, 1);
+
+			// Other 
+			dataRaw = get_RawData('Ann_PEAvg');
+			dataStat = get_Stat(dataRaw);
+			draw_Card('card_avgPE', dataRaw, dataStat, 14, -1);
+
+			dataRaw = get_RawData('Ann_EPS');
+			dataStat = get_Stat(dataRaw);
+			draw_Card('card_EPS', dataRaw, dataStat, NaN, 0);
+
+			dataRaw = get_RawData('Ann_GrossProfit');
+			dataStat = get_Stat(dataRaw);
+			draw_Card('card_GrossProfit', dataRaw, dataStat, NaN, 0);
+			
+//debugger;
+		} // redraw
+
+		function draw(data) {
+			fin_data = data;
+			var parseDate = d3.time.format("%Y-%m-%d").parse;
+			fin_data.forEach(function(el) {
+				el.Date = parseDate(el.Date);
+				el.Value = +el.Value;
+			});
+			redraw();
+		}
+		
+		function draw_Stock(stock_name) {
+			var stock = stock_name.split(":");
+			$('.dashhead-title').html(stock[1] + " (" + stock[0] + ")");
+			// load data and draw charts
+			d3.csv("/data/" + stock[0] + "_FinStatements_Ann.csv", draw);
+			$('html, body').animate({ scrollTop: 0 }, 'fast');
+			return true;
+		}
+	</script>
+</head>
+<body>
+	<div id="temp"></div>
+	<div class="container">
+		<header class="m-t-md">
+			<div class="dashhead">
+				<div class="dashhead-titles">
+					<h1 class="dashhead-title"></h1>
+					<h3 class="dashhead-subtitle">Annual Financial Statements</h3>
+				</div>
+			</div>
+		</header>
+
+		<div class="hr-divider m-t-md m-b">
+			<h3 class="hr-divider-content hr-divider-heading">Liquidity Ratios</h3>
+		</div>
+		<div class="row">
+			<div class="col-md-4">
+				<div id="card_RatioCurrent" class="statcard statcard-info">
+					<div class="p-a">
+						<span class="statcard-desc">Current Ratio</span>
+						<h2 class="statcard-number"></h2>
+						<hr class="statcard-hr m-b-0" />
+					</div>
+					<svg id="spark_RatioCurrent" class="sparkline"></svg>
+				</div>
+				<p class="muted">
+					Current Ratio measures the ability to meet short term obligations. Generally accepted standard is 2 (current assets should be 2 times or 200% of current liabilities).
+				</p>
+			</div>
+			<div class="col-md-4">
+				<div id="card_RatioQuick" class="statcard statcard-info">
+					<div class="p-a">
+						<span class="statcard-desc">Quick Ratio</span>
+						<h2 class="statcard-number"></h2>
+						<hr class="statcard-hr m-b-0" />
+					</div>
+					<svg id="spark_RatioQuick" class="sparkline"></svg>
+				</div>
+				<p class="muted">
+					Measures immediate liquidity or the cash available to cover immediate liabilities. A safe margin would be at least 1 (100%).
+				</p>
+			</div>
+			<div class="col-md-4">
+				<div id="card_RatioLeverage" class="statcard statcard-info">
+					<div class="p-a">
+						<span class="statcard-desc">Financial Leverage</span>
+						<h2 class="statcard-number"></h2>
+						<hr class="statcard-hr m-b-0" />
+					</div>
+					<svg id="spark_RatioLeverage" class="sparkline"></svg>
+				</div>
+				<p class="muted">
+					Defined as total assets divided by total shareholders' equity. The higher the ratio, the more debt a company uses in its capital structure.
+				</p>
+			</div>
+		</div>
+
+		<div class="hr-divider m-t-md m-b">
+			<h3 class="hr-divider-content hr-divider-heading">Profitability Ratios</h3>
+		</div>
+		<p>A return on profitability ratios of 15% is generally considered necessary to fund future growth from within a business.</p>
+		<div class="row">
+			<div class="col-md-4">
+				<div id="card_ROA" class="statcard statcard-info">
+					<div class="p-a">
+						<span class="statcard-desc">ROA</span>
+						<h2 class="statcard-number"></h2>
+						<hr class="statcard-hr m-b-0" />
+					</div>
+					<svg id="spark_ROA" class="sparkline"></svg>
+				</div>
+				<p class="muted">
+					Return on Assets (ROA) measures the income (profit) that is generated by the use of the assets of the business.
+				</p>
+			</div>
+			<div class="col-md-4">
+				<div id="card_ROE" class="statcard statcard-info">
+					<div class="p-a">
+						<span class="statcard-desc">ROE</span>
+						<h2 class="statcard-number"></h2>
+						<hr class="statcard-hr m-b-0" />
+					</div>
+					<svg id="spark_ROE" class="sparkline"></svg>
+				</div>
+				<p class="muted">
+					Return on Equity (ROE) is a measure of profitability that calculates how many dollars of profit a company generates with each dollar of shareholders equity. 
+					ROE is sometimes called "return on net worth."
+				</p>
+			</div>
+			<div class="col-md-4">
+				<div id="card_ROIC" class="statcard statcard-info">
+					<div class="p-a">
+						<span class="statcard-desc">ROIC</span>
+						<h2 class="statcard-number"></h2>
+						<hr class="statcard-hr m-b-0" />
+					</div>
+					<svg id="spark_ROIC" class="sparkline"></svg>
+				</div>
+				<p class="muted">
+					The Return on Invested Capital (ROIC) measure gives a sense of how well a company is using its money to generate returns. Some investors use this figure as a final evaluation to determine whether or not to invest in a company.
+				</p>
+			</div>
+		</div>
+		
+		<div class="hr-divider m-t-md m-b">
+			<h3 class="hr-divider-content hr-divider-heading">Other</h3>
+		</div>
+		<div class="row">
+			<div class="col-md-4">
+				<div id="card_avgPE" class="statcard statcard-info">
+					<div class="p-a">
+						<span class="statcard-desc">Average PE Ratio</span>
+						<h2 class="statcard-number"></h2>
+						<hr class="statcard-hr m-b-0" />
+					</div>
+					<svg id="spark_AvgPE" class="sparkline"></svg>
+				</div>
+				<p class="muted">
+					The PE ratio (price-to-earnings ratio) is a financial ratio used for valuation: a higher PE ratio means that investors are paying more 
+					for each unit of net income, so the stock is more expensive compared to one with lower PE ratio. The average U.S. equity PE ratio from 
+					1900 to 2005 is 14.
+				</p>
+			</div>
+			<div class="col-md-4">
+				<div id="card_EPS" class="statcard statcard-info">
+					<div class="p-a">
+						<span class="statcard-desc">EPS</span>
+						<h2 class="statcard-number"></h2>
+						<hr class="statcard-hr m-b-0" />
+					</div>
+					<svg id="spark_EPS" class="sparkline"></svg>
+				</div>
+				<p class="muted"></p>
+			</div>
+			<div class="col-md-4">
+				<div id="card_GrossProfit" class="statcard statcard-info">
+					<div class="p-a">
+						<span class="statcard-desc">Gross Profit</span>
+						<h2 class="statcard-number"></h2>
+						<hr class="statcard-hr m-b-0" />
+					</div>
+					<svg id="spark_GrossProfit" class="sparkline"></svg>
+				</div>
+				<p class="muted"></p>
+			</div>
+		</div>
+
+		<hr />
+		<h4>Test & Debug Section</h4>
+		<p>This visualization is designed to show a single stock data. However, for testing purposes you may select one of the other few stocks available below. 
+		Note that TEST stock (Test Corp.) is added for missing data testing – we should not expect that all data will always be available for all stocks, therefore 
+		this page should be able to handle missing data issues.</p>
+		<h4>Select stock for analysis:</h4>
+		<select class="form-control" onchange="draw_Stock(this.value);">
+			<option value="AAPL:Apple Inc." selected="selected">Apple Inc.</option>
+			<option value="GOOGL:Alphabet Inc.">Alphabet Inc.</option>
+			<option value="MSFT:Microsoft Corporation">Microsoft Corporation</option>
+			<option value="ORCL:Oracle Corporation">Oracle Corporation</option>
+			<option value="TEST:Test Corp.">Test Corp.</option>
+		</select>
+		<hr />
+		<footer>
+			<hr />
+			<p>by Alex Bugrimenko, 2016</p>
+		</footer>
+	</div>
+	
+	<div id='tooltip' class='tooltip' style='opacity:0;'></div>
+
+	<script type="text/javascript">
+		$(function () {
+			// bootstrap
+			//$('[data-toggle="popover"]').popover();
+			window.addEventListener('resize', resize, false);
+		});
+		// load data and draw charts for the first time
+		//d3.csv("/data/AAPL_FinStatements_Ann.csv", draw);
+		draw_Stock('AAPL:Apple Inc.');
+	</script>
+
+</body>
+</html>
+

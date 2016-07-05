@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>P6: Data Visualization</title>
+	<title>P6: Data Visualization by Alex Bugrimenko</title>
 	
 	<link rel="stylesheet" href="/css/bootstrap.min.css" media="screen">
 	<link rel="stylesheet" href="/css/statcard.css" media="screen">
@@ -299,7 +299,6 @@
 					else {
 						clearInterval(bkg_interval);
 					}
-					//$('#temp').html(bkg_elapsed);
 				}, 25);
 			}, 1000);
 		} // draw_Card
@@ -375,23 +374,6 @@
 					ttip.transition().duration(200).style("opacity", 0);	
 				})
 			;
-/*
-			// x axis
-			var scale_xt = d3.time.scale()
-				.domain([gr_rates_stat.minDate, gr_rates_stat.maxDate])	// need raw start and end dates	-1000*60*60*24*365*2
-				.range([margin, width - 2*margin]);
-			var axis_x = d3.svg.axis()
-				.scale(scale_xt)
-				.orient('bottom')
-				.tickSize(3)
-				//.ticks(5)
-				.tickFormat(d3.time.format("%Y"))
-			;
-			svg.selectAll('g')
-				.attr('class', 'x axis')
-				.attr('transform', 'translate(' + margin + ',' + (height-margin) + ')')
-				.call(axis_x);
-*/
 
 			// zero line - must be based on data and stat (growth rates have 1 year less)
 			if (isUndefOrNaN(gr_rates_stat.min) == false) {
@@ -406,7 +388,7 @@
 			}
 		} // draw_GrRates
 		
-		function draw_Statement(card_id, gr_rates_id, item_type, item_title) {
+		function draw_Statement(card_id, item_type, item_title) {
 			draw_Card(dest_id=card_id, data_type=item_type, comp_value=NaN, comp_logic=0, title=item_title);
 			setTimeout(function() {
 				draw_GrRates(dest_id=card_id, data_type=item_type, isClearFirst=false);
@@ -423,9 +405,9 @@
 			
 			if (isDrawStatement) {
 				// --- Fin Statements - selected 
-				draw_Statement(card_id='card_IncomeSt', gr_rates_id='card_IncomeStGrRates', item_type=$('#sel_IncomeSt').val(), item_title=$('#sel_IncomeSt option:selected').text());
-				draw_Statement(card_id='card_CashFlowSt', gr_rates_id='card_CashFlowStGrRates', item_type=$('#sel_CashFlowSt').val(), item_title=$('#sel_CashFlowSt option:selected').text());
-				draw_Statement(card_id='card_BalanceSh', gr_rates_id='card_BalanceShGrRates', item_type=$('#sel_BalanceSh').val(), item_title=$('#sel_BalanceSh option:selected').text());
+				draw_Statement(card_id='card_IncomeSt', item_type=$('#sel_IncomeSt').val(), item_title=$('#sel_IncomeSt option:selected').text());
+				draw_Statement(card_id='card_CashFlowSt', item_type=$('#sel_CashFlowSt').val(), item_title=$('#sel_CashFlowSt option:selected').text());
+				draw_Statement(card_id='card_BalanceSh', item_type=$('#sel_BalanceSh').val(), item_title=$('#sel_BalanceSh option:selected').text());
 			}
 			
 			if (isDrawRatios) {
@@ -539,7 +521,7 @@
 		<div id="finSt_Row" class="row">
 			<div class="col-md-4">
 				<h4>Income Statement</h4>
-				<select id="sel_IncomeSt" class="form-control" onchange="draw_Statement('card_IncomeSt', 'card_IncomeStGrRates', this.value, $('#sel_IncomeSt option:selected').text());">
+				<select id="sel_IncomeSt" class="form-control" onchange="draw_Statement('card_IncomeSt', this.value, $('#sel_IncomeSt option:selected').text());">
 					<option value="Ann_Revenue">Total Revenue (Sales)</option>
 					<option value="Ann_GrossProfit">Gross Profit</option>
 					<option value="Ann_IncomeOp">Operation Income</option>
@@ -559,18 +541,10 @@
 					</div>
 					<svg class="sparkline"></svg>
 				</div>
-<!--				
-				<div id="card_IncomeStGrRates" class="statcard statcard-info" style="margin-top: 5px !important;">
-					<div class="p-a">
-						<span class="statcard-desc">Growth Rates</span>
-					</div>
-					<svg class="sparkline"></svg>
-				</div>
--->				
 			</div>
 			<div class="col-md-4">
 				<h4>Cash Flow Statement</h4>
-				<select id="sel_CashFlowSt" class="form-control" onchange="draw_Statement('card_CashFlowSt', 'card_CashFlowStGrRates', this.value, $('#sel_CashFlowSt option:selected').text());">
+				<select id="sel_CashFlowSt" class="form-control" onchange="draw_Statement('card_CashFlowSt', this.value, $('#sel_CashFlowSt option:selected').text());">
 					<option value="Ann_CashFromOA">Cash From Operating</option>
 					<option value="Ann_CapExp">Capital Expenditures</option>
 					<option value="Ann_CashDiv">Cash Dividends</option>
@@ -587,18 +561,10 @@
 					</div>
 					<svg class="sparkline"></svg>
 				</div>
-<!--				
-				<div id="card_CashFlowStGrRates" class="statcard statcard-info" style="margin-top: 5px !important;">
-					<div class="p-a">
-						<span class="statcard-desc">Growth Rates</span>
-					</div>
-					<svg class="sparkline"></svg>
-				</div>
--->
-				</div>
+			</div>
 			<div class="col-md-4">
 				<h4>Balance Sheet</h4>
-				<select id="sel_BalanceSh" class="form-control" onchange="draw_Statement('card_BalanceSh', 'card_BalanceShGrRates', this.value, $('#sel_BalanceSh option:selected').text());">
+				<select id="sel_BalanceSh" class="form-control" onchange="draw_Statement('card_BalanceSh', this.value, $('#sel_BalanceSh option:selected').text());">
 					<option value="Ann_AcctsReceivable">Accounts Receivable</option>
 					<option value="Ann_AcctsPayable">Accounts Payable</option>
 					<option value="Ann_Inventory">Inventory</option>
@@ -621,14 +587,6 @@
 					</div>
 					<svg class="sparkline"></svg>
 				</div>
-<!--				
-				<div id="card_BalanceShGrRates" class="statcard statcard-info" style="margin-top: 5px !important;">
-					<div class="p-a">
-						<span class="statcard-desc">Growth Rates</span>
-					</div>
-					<svg class="sparkline"></svg>
-				</div>
--->				
 			</div>
 		</div>
 		
@@ -742,16 +700,6 @@
 				<option value="TEST:Test Corp.">Test Corp.</option>
 			</select>
 		</div>
-		<hr />
-		<h4>References</h4>
-		<ul>
-			<li><a target="_blank" href="http://www.visualcinnamon.com/2015/11/learnings-from-a-d3-js-addict-on-starting-with-canvas.html">http://www.visualcinnamon.com/2015/11/learnings-from-a-d3-js-addict-on-starting-with-canvas.html</a></li>
-			<li><a target="_blank" href="https://bocoup.com/weblog/d3js-and-canvas">https://bocoup.com/weblog/d3js-and-canvas</a></li>
-			<li><a target="_blank" href="http://www.tnoda.com/blog/2013-12-19">http://www.tnoda.com/blog/2013-12-19</a></li>
-			<li><a target="_blank" href="https://github.com/d3/d3/wiki/Time-Formatting">https://github.com/d3/d3/wiki/Time-Formatting</a></li>
-			<li><a target="_blank" href="http://bl.ocks.org/d3noob/a22c42db65eb00d4e369">http://bl.ocks.org/d3noob/a22c42db65eb00d4e369</a></li>
-			<li><a target="_blank" href="http://stackoverflow.com/questions/13728402/what-is-the-difference-d3-datum-vs-data">http://stackoverflow.com/questions/13728402/what-is-the-difference-d3-datum-vs-data</a></li>
-		</ul>
 		<footer>
 			<hr />
 			<p>by Alex Bugrimenko, 2016</p>
