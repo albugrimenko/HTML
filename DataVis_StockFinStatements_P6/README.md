@@ -25,7 +25,7 @@ My goal in this project is to create effective visualization for presenting comp
 
 ## Design 
 
-In this project we are focusing on a single stock analysis - my visualization should present data for a single stock at a time and I’m considering stock selection to be out of scope of this project (yet, for simplicity and proper testing, information about several stocks available and it is easy to switch between them at the bottom of the page).
+In this project I'm focusing on a single stock analysis - my visualization should present data for a single stock at a time and I’m considering stock selection to be out of scope of this project (yet, for simplicity and proper testing, information about several stocks available and it is easy to switch between them at the bottom of the page).
 
 ### The Data
 
