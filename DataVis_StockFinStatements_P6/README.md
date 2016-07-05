@@ -27,6 +27,12 @@ My goal in this project is to create effective visualization for presenting comp
 
 In this project I'm focusing on a single stock analysis - my visualization should present data for a single stock at a time and I’m considering stock selection to be out of scope of this project (yet, for simplicity and proper testing, information about several stocks available and it is easy to switch between them at the bottom of the page).
 
+There is a simple animation implemented when user loads the page for the first time. The animation is focusing on demonstrating major features of the page: 
+
+* importance of growth rates chart for financial statement items
+* shows liquidity and profitability ratios below financial statements to emphasize that they are based on financial data
+* uses color coding to highlight “good” and “bad” values where generally accepted standards are available
+
 ### The Data
 
 I can generate annual financial statements in a simple CSV file format for all major US stocks using [stock2own.com](http://www.stock2own.com) services. Each file contains information about a single stock and may contain up to 10 years of historical data for each item (as much as available). All items in each file are sorted by item type and date (reverse sort order for date – the latest row is always the first one).
