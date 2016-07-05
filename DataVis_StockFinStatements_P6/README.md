@@ -75,7 +75,42 @@ In this project I'm using D3.js to create my visualization. To set the page layo
 
 
 ## Feedback 
-- include all feedback you received from others on your visualization from the first sketch to the final visualization
+
+I received feedback in a verbal form from several of my friends and colleagues who are interested in stock market and investing. None of them are professional investors.
+
+**One of the first implementations (index_00.html)** had Liquidity, Profitability and Other Ratios sections. In the "Other Ratios" section I included most popular items from the financial statements, such as "Average PE", "EPS" and "Gross Profit". 
+
+Almost immediate feedback was that this is not nearly enough. Users still want the ability to see all available items. Perhaps not all at the same time (table view), but for some businesses they want to focus on one things and for others they may need to deeply analyze completely different items, so predefined set of items was not enough.
+
+At the same time, people I showed my implementation seemed to like the way I present ratios and the whole idea of background colors. 
+
+_User #1:_ I like the ratios section and background color. 
+
+_User #2:_ When I analyze financial statements I like to see all of them. Yes, I read them one by one, but still I need to see different items. Profitability Ratios are good to know but is not enough.
+
+**In the next implementation (index_01.html)** converted "Other Ratios" into ability to see any financial statement item by creating 3 drop down lists for each document type: Income Statement, Cash Flow Statement and Balance Sheet. User can select any item from the list and see 2 charts: linear chart for values for the specified category and a vertical bar chart for growth rates.
+
+Both charts are shown one under another, each bar is shown under appropriate year, so both charts are in sync in terms of time axis.
+Though this implementation was a bit confusing – based on feedback I got it was difficult for users to understand the relationship between two charts and importance of the growth rate chart was not clear. Most of them mentioned that they practically ignored growth rate chart and were focusing on a linear chart.
+
+_User #1:_ I like the fact that you show financial items grouped by document type. This is exactly how all other financial sites group them, so this is easy and convenient.
+
+_User #2:_ I like that I can select items I want to focus on. It is unusual to see them one by one, but maybe I just need some time to get used to it.
+
+_User #3:_ What growth rates chart? Well, it is nice to see it there, but I’m not sure if I want to focus on it.
+
+**In the final implementation** I wanted to emphasize that growth rate chart is essentially showing the same data as a linear chart. 
+
+In order to do that I combined those two charts together. I also placed growth rates bars between year labels, because growth represent the change between years. I did not create a new y-axis for growth rates and this chart does not have any vertical axis. It allows me to put together values that are measured in different units and scales. For those people who are interested in exact and precise numbers, I animated my charts so when user move mouse pointer over a circle on a line chart or over a bar chart, it is highlighted and a toolbar with exact number shown up.
+
+As a result, I got a reasonably good feedback and several people pointed out that before they have not realized how much raw numbers and growth rates are connected. In many cases, they used to think about those two charts as two independent charts and now they really started to use growth rates chart as a "quick spot check" for the overall performance for any particular financial statement item.
+
+_User #1:_ Oh, now I see what you were talking about! Yes, I like it! Why my online brokerages never shows something I can easily understand? 
+
+_User #2:_ It makes sense now. I can really use it as a quick spot check. I like it.
+
+_User #3:_ Can you do it for multiple stocks at a time? Just for comparison...
+
 
 ## Resources
 
