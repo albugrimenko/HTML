@@ -67,7 +67,7 @@ Just like ratios, financial statement item is a time series type of data, theref
 
 It is very important to see the trend of the data change, therefore I'm adding a year-over-year growth rate chart for any item selected. I'm presenting growth rates as a vertical bar chart, where it is easy to compare value for each year with previous and next year. 
 
-The whole purpose of the growth rate chart is to show the trend, therefore there is no necessity to focus on exact values (each value will be shown if user points mouse pointer over any circle or bar), which allows me to combine two types of charts without warring about different axis and scales. However, I want to make sure that they are synchronized to time axis, because this is important to know which year produced what growth. To better demonstrate relationship between raw data and growth rates, in the final version I'm showing both linear and bar charts on the same place. It allows clearly and easily identify which growth rates was produced in what year.
+The whole purpose of the growth rate chart is to show the trend, therefore there is no necessity to focus on exact values (each value will be shown if user points mouse pointer over any circle or bar), which allows me to combine two types of charts without warring about different axis and scales. However, I want to make sure that they are synchronized to time axis, because this is important to know which year produced what growth. To better demonstrate relationship between raw data and growth rates, in the final version I'm showing both linear and bar charts on the same chart. It allows clearly and easily identify which growth rates was produced in what year.
 
 #### Technical Implementation
 
