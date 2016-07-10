@@ -3,6 +3,9 @@ _by Alex Bugrimenko_
 
 ## Summary 
 
+### Real life implementation on stock2own.com:
+[http://www.stock2own.com/StockAnalysis/Stock/US/AAPL](http://www.stock2own.com/StockAnalysis/Stock/US/AAPL)
+
 #### In this project I want to create a visualization for company financial statements.
 
 Usually, financial statements presented as a simple table with a lot of numbers grouped by years and divided into 3 documents: Income Statement, Cash Flow Statement and Balance Sheet. For example, here is how annual statements for Apple Inc. presented on NASDAQ and Google:
