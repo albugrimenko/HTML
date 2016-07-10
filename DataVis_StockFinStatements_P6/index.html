@@ -160,7 +160,8 @@
 			var area = d3.svg.area()
 				//.interpolate("basis")
 				.x(function(el) { return scale_x(el.Date); })
-				.y0(height)
+				//.y0(height)
+				.y0(function(el) { return scale_y(0); })
 				.y1(function(el) { return scale_y(el.Value); });
 
 			svg.append('path')
